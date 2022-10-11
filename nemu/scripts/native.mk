@@ -48,3 +48,9 @@ clean-tools: $(clean-tools)
 clean-all: clean distclean clean-tools
 
 .PHONY: run gdb run-env clean-tools clean-all $(clean-tools)
+
+count:
+	@echo + lines in head and source file:
+	find . -name '*.[hc]' | xargs cat | wc -l
+	@echo + lines in head and source file without empty lines:
+	find . -name '*.[hc]' | xargs cat | grep -v '^$$' | wc -l
