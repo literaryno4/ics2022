@@ -18,6 +18,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "sdb.h"
+#include "memory/vaddr.h"
+#include "memory/paddr.h"
 
 static int is_batch_mode = false;
 
@@ -54,6 +56,19 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 
+static int cmd_si(char *args);
+
+static int cmd_x(char *args);
+
+static int cmd_p(char *args);
+
+static int cmd_w(char *args);
+
+static int cmd_d(char *args);
+
+static int cmd_info(char *args);
+
+static int cmd_help(char *args);
 static struct {
   const char *name;
   const char *description;
@@ -62,12 +77,120 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-
-  /* TODO: Add more commands */
-
+  { "si", "Usage: si [N], step n instruction(s), N=1 by default", cmd_si},
+  { "info", "Usage: info SUBCMD\n"
+    "info r, print status of registers;\n"
+    "info w, prinf status of watchpoints.", cmd_info},
+  { "x", "Usage: x N EXPR, prinf N 4 bytes of addr of EXPR", cmd_x},
+  { "p", "Usage: p EXPR, calculate of EXPR", cmd_p},
+  { "w", "Usage: w EXPR, set watchpoint, stop when EXPR changes", cmd_w},
+  { "d", "Usage: d N, delete watchpoint of number N", cmd_d},
 };
 
 #define NR_CMD ARRLEN(cmd_table)
+
+static int check_mem(vaddr_t addr) {
+  if (!in_pmem(addr)) {
+    Log("address = " FMT_PADDR " is out of bound of pmem [" FMT_PADDR ", " FMT_PADDR "] at pc = " FMT_WORD,
+      addr, PMEM_LEFT, PMEM_RIGHT, cpu.pc);
+    return 1;
+  }
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  char* arg = strtok(NULL, " ");
+  int i, n = atoi(arg);
+  vaddr_t addr;
+  arg = strtok(NULL, " ");
+  addr = (vaddr_t)strtol(arg, NULL, 16);
+  
+  for (i = 1; i <= n; ++i) { 
+    if (check_mem(addr)) {
+      break;
+    }
+    if ((i - 1) % 4 == 0) {
+      printf("%016x: ", addr);
+    }
+    printf("%08x ", vaddr_read(addr, 4));
+    addr += 4;
+    if (i % 4 == 0) {
+      printf("\n");
+    }
+  }
+  if (i % 4 != 0) {
+    printf("\n");
+  }
+  return 0;
+}
+
+static int cmd_p(char *args) {
+  char* arg = strtok(NULL, "\n");
+  bool success;
+
+  word_t ans = expr(arg, &success);
+  if (success) {
+    printf("%d 0x%x\n", ans, ans);
+  } else {
+    printf("bad expr, please check!\n");
+  }
+
+  return 0;
+}
+
+static int cmd_w(char *args) {
+  char* arg = strtok(NULL, "\n");
+  bool success;
+
+  word_t ans = expr(arg, &success);
+  if (success) {
+    WP* wp = new_wp();
+    wp->old_val = ans; 
+    strcpy(wp->expr, arg);
+  } else {
+    printf("bad expr, please check!\n");
+    return 0;
+  }
+
+  return 0;
+}
+static int cmd_d(char *args) {
+  free_wp(atoi(strtok(NULL, "\n")));
+  return 0;
+}
+
+static int cmd_si(char *args) {
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+  int n;
+
+  if (arg == NULL) {
+    cpu_exec(1);  
+  }
+  else {
+    n = atoi(arg);
+    cpu_exec(n);
+  }
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  /* extract the first argument */
+  char *arg = strtok(NULL, " ");
+
+  if (arg == NULL) {
+    printf("Usage: info SUBCMD\n");
+  }
+  else {
+    if (strcmp(arg, "r") == 0) {
+      isa_reg_display();
+    } else if (strcmp(arg, "w") == 0) {
+    } else {
+      printf("Unknown command '%s'\n", arg);
+    }
+  }
+  return 0;
+}
 
 static int cmd_help(char *args) {
   /* extract the first argument */
@@ -134,10 +257,41 @@ void sdb_mainloop() {
   }
 }
 
+void test_expr() {
+  FILE* stream;
+  char* line = NULL;
+  size_t len = 0;
+  ssize_t nread;
+  word_t result;
+  char* exp;
+  bool success;
+
+  if ((stream = fopen("/home/chao/ics2022/nemu/src/input", "r")) == NULL) {
+    perror("fopen");
+    exit(EXIT_FAILURE);
+  }
+
+  while ((nread = getline(&line, &len, stream)) != -1) {
+    result = atoi(strtok(line, " "));
+    exp = strtok(NULL, "\n");
+    printf("%d %s: ", result, exp);
+    word_t ans = expr(exp, &success);
+    if (result == ans) {
+      printf( ANSI_FG_GREEN "pass" ANSI_NONE "\n");
+    } else {
+      printf( ANSI_FG_RED "failed, %d != %d" ANSI_NONE "\n", result, ans);
+    }
+  }
+
+  free(line);
+  fclose(stream);
+}
+
 void init_sdb() {
   /* Compile the regular expressions. */
   init_regex();
 
   /* Initialize the watchpoint pool. */
   init_wp_pool();
+  // test_expr();
 }

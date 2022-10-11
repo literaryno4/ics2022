@@ -23,7 +23,15 @@ const char *regs[] = {
   "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
 };
 
+#define NR_REGS 32
+
 void isa_reg_display() {
+  printf("register info: \n");
+  int i; 
+  for (i = 0; i < NR_REGS; ++i) {
+    printf("%4s 0x%08x\n", regs[i], cpu.gpr[i]);
+  }
+  printf("%4s 0x%08x\n", "pc", cpu.pc);
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {

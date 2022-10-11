@@ -53,11 +53,14 @@ static long load_img() {
   FILE *fp = fopen(img_file, "rb");
   Assert(fp, "Can not open '%s'", img_file);
 
+  // set offset to end of file then ftell return size of file
+  // obviously stupid
   fseek(fp, 0, SEEK_END);
   long size = ftell(fp);
 
   Log("The image is %s, size = %ld", img_file, size);
 
+  // offset back to begin of file
   fseek(fp, 0, SEEK_SET);
   int ret = fread(guest_to_host(RESET_VECTOR), size, 1, fp);
   assert(ret == 1);
@@ -121,6 +124,7 @@ void init_monitor(int argc, char *argv[]) {
   long img_size = load_img();
 
   /* Initialize differential testing. */
+  // to be read
   init_difftest(diff_so_file, img_size, difftest_port);
 
   /* Initialize the simple debugger. */

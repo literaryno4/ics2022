@@ -31,8 +31,56 @@ static char *code_format =
 "  return 0; "
 "}";
 
+static char* ops[] = {
+  "+",
+  "-",
+  "*",
+  "/",
+};
+
+#define NR_OPS sizeof(ops) / sizeof(char*)
+
+static uint32_t choose(uint32_t n) {
+  return rand() % n;
+}
+
+char* p;
+
+static void do_gen_rand_expr(int dpth) {
+  int chs = dpth >= 5 ? 0 : choose(3);
+  switch (chs) {
+    case 0: 
+      {
+        uint32_t num = rand() % 100;
+        char numstr[12] = {'\0'};
+        sprintf(numstr, "%d", num);
+        strcpy(p, numstr);
+        p += strlen(numstr);
+      }
+      break;
+    case 1: 
+      p[0] = '(';
+      ++p;
+      do_gen_rand_expr(dpth + 1);
+      p[0] = ')';
+      ++p;
+      break;
+    default:
+      {
+        do_gen_rand_expr(dpth + 1);
+        char* op = ops[choose(NR_OPS)];
+        strcpy(p, op);
+        p += strlen(op);
+        do_gen_rand_expr(dpth + 1);
+      }
+      break;
+  }
+}
+
 static void gen_rand_expr() {
-  buf[0] = '\0';
+  p = buf;
+  do_gen_rand_expr(0);
+  p[0] = '\0';
 }
 
 int main(int argc, char *argv[]) {
@@ -60,7 +108,11 @@ int main(int argc, char *argv[]) {
     assert(fp != NULL);
 
     int result;
-    fscanf(fp, "%d", &result);
+    ret = fscanf(fp, "%d", &result);
+    // filter div 0
+    if (ret < 0) {
+      continue;
+    }
     pclose(fp);
 
     printf("%u %s\n", result, buf);
