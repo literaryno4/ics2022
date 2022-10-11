@@ -38,6 +38,26 @@ static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
   IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));
+
+#ifdef CONFIG_WATCHPOINT
+#include "../monitor/sdb/sdb.h"
+  word_t ans;
+  bool success, changed = false;
+  WP* head = wp_head();
+  while (head != NULL) {
+    ans = expr(head->expr, &success);
+    if (success && ans != head->old_val) {
+      changed = true;
+      printf("Old value = %d(0x%x)\n", head->old_val, head->old_val);
+      printf("New value = %d(0x%x)\n", ans, ans);
+      head->old_val = ans;
+    }
+    head = head->next;
+  }
+  if (changed) {
+    nemu_state.state = NEMU_STOP;
+  }
+#endif
 }
 
 static void exec_once(Decode *s, vaddr_t pc) {

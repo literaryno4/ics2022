@@ -145,6 +145,16 @@ static bool make_token(char *e) {
         switch (rules[i].token_type) {
           case TK_NOTYPE:
             break;
+          case '*':
+            // dereference type
+            if (nr_token == 0 || 
+              (tokens[nr_token -1].type != TK_INTEGER && 
+              tokens[nr_token -1].type != ')' && 
+              tokens[nr_token -1].type != TK_REGNAME)) {
+              tokens[nr_token].type = TK_DEREF;
+              ++nr_token;
+              break;
+            }
           case TK_INTEGER:
           case TK_REGNAME:
             if (nr_token > 0 && 
