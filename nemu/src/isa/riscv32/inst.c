@@ -13,6 +13,7 @@
 * See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
+#include "common.h"
 #include "local-include/reg.h"
 #include <cpu/cpu.h>
 #include <cpu/ifetch.h>
@@ -27,6 +28,19 @@ enum {
   TYPE_N, // none
 };
 
+#ifdef CONFIG_FTRACE
+
+char* find_symbol(word_t);
+int space_len = 0;
+
+static void print_space (int len) {
+  for (int i = 0; i < len; ++i) {
+    printf(" ");
+  }
+}
+
+#endif
+
 #define src1R() do { *src1 = R(rs1); } while (0)
 #define src2R() do { *src2 = R(rs2); } while (0)
 #define immI() do { *imm = SEXT(BITS(i, 31, 20), 12); } while(0)
@@ -40,6 +54,38 @@ enum {
                            (BITS(i, 7, 7) << 11) | \
                            (BITS(i, 30, 25) << 5) | \
                            (BITS(i, 11, 8) << 1); } while(0)
+
+static void do_jal(Decode *s, int dest,  word_t imm) {
+  R(dest) = s->pc + 4; 
+  s->dnpc = s->pc + imm;
+#ifdef CONFIG_FTRACE
+  word_t addr = s->dnpc;
+  printf("%x : ", s->pc);
+  print_space(space_len);
+  printf("call [%s@%x]\n", find_symbol(addr), addr);
+  space_len += 2;
+#endif
+}
+
+static void do_jalr(Decode *s, int dest, word_t src1,  word_t imm) {
+          R(dest) = s->pc + 4; 
+          s->dnpc = ((src1 + imm) & ~1);
+#ifdef CONFIG_FTRACE
+  word_t addr = s->dnpc;
+  uint32_t i = s->isa.inst.val;
+  if ((BITS(i, 19, 15) & 0b11110) == 0) {
+    space_len -= 2;
+    printf("%x : ", s->pc);
+    print_space(space_len);
+    printf("ret [%s@%x]\n", find_symbol((s->pc + 4)), addr);
+  } else {
+    printf("%x : ", s->pc);
+    print_space(space_len);
+    printf("call [%s@%x]\n", find_symbol(addr), addr);
+    space_len += 2;
+  }
+#endif
+}
 
 static void decode_operand(Decode *s, int *dest, word_t *src1, word_t *src2, word_t *imm, int type) {
   uint32_t i = s->isa.inst.val;
@@ -94,16 +140,13 @@ static int decode_exec(Decode *s) {
   INSTPAT("0000000 ????? ????? 101 ????? 00100 11", srli   , I, R(dest) = (src1 >> (imm & 0x1f)));
   INSTPAT("0100000 ????? ????? 101 ????? 00100 11", srai   , I, R(dest) = ((sword_t)src1 >> (imm & 0x1f)));
   // -- conctrol
-  INSTPAT("??????? ????? ????? ??? ????? 11001 11", jalr   , I, \
-          R(dest) = s->pc + 4; \
-          s->dnpc = ((src1 + imm) & ~1) \
-  );
+  INSTPAT("??????? ????? ????? ??? ????? 11001 11", jalr   , I, do_jalr(s, dest, src1, imm));
 
   // ******** U type ************
   INSTPAT("??????? ????? ????? ??? ????? 00101 11", auipc  , U, R(dest) = imm + s->pc);
 
   // ******** J type ************
-  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal    , J, R(dest) = s->pc + 4; s->dnpc = s->pc + imm);
+  INSTPAT("??????? ????? ????? ??? ????? 11011 11", jal    , J, do_jal(s, dest, imm));
 
   // ******** R type ************
   INSTPAT("0000000 ????? ????? 000 ????? 01100 11", add    , R, R(dest) = src1 + src2);

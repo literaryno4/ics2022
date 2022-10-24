@@ -30,11 +30,20 @@ uint64_t g_nr_guest_inst = 0;
 static uint64_t g_timer = 0; // unit: us
 static bool g_print_step = false;
 
+#define IRBUFSZ 16
+char iringbuf[IRBUFSZ][128];
+int irbpos = 0;
+
 void device_update();
 
 static void trace_and_difftest(Decode *_this, vaddr_t dnpc) {
 #ifdef CONFIG_ITRACE_COND
-  if (ITRACE_COND) { log_write("%s\n", _this->logbuf); }
+  if (ITRACE_COND) { 
+    log_write("%s\n", _this->logbuf); 
+    // add iringbuf
+    strcpy(iringbuf[irbpos], _this->logbuf);
+    irbpos = (irbpos + 1) % IRBUFSZ;
+  }
 #endif
   if (g_print_step) { IFDEF(CONFIG_ITRACE, puts(_this->logbuf)); }
   IFDEF(CONFIG_DIFFTEST, difftest_step(_this->pc, dnpc));
@@ -138,6 +147,17 @@ void cpu_exec(uint64_t n) {
            (nemu_state.halt_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) :
             ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
           nemu_state.halt_pc);
+#ifdef CONFIG_ITRACE_COND
+      if (nemu_state.halt_ret != 0) {
+        for (int i = 0; i < IRBUFSZ; ++i) {
+          if (i == (irbpos + IRBUFSZ - 1) % IRBUFSZ) {
+            printf("  --> %s\n", iringbuf[i]);
+          } else {
+            printf("      %s\n", iringbuf[i]);
+          }
+        }
+      }
+#endif
       // fall through
     case NEMU_QUIT: statistic();
   }
