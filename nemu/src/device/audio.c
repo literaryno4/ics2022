@@ -29,7 +29,6 @@ enum {
 
 static uint8_t *sbuf = NULL;
 static uint32_t *audio_base = NULL;
-
 // start of the audio stream buffer ring
 static uint8_t *sbuf_start;
 static int inited_audio = false;
@@ -48,6 +47,7 @@ static void audio_play(void*userdata, uint8_t* stream, int len) {
     ++b;
   }
   audio_base[5] -= nread;
+  assert(audio_base[5] >= 0);
   if (len > nread) {
     memset(stream + nread, 0, len - nread);
   }
@@ -77,6 +77,7 @@ static void audio_io_handler(uint32_t offset, int len, bool is_write) {
 void init_audio() {
   uint32_t space_size = sizeof(uint32_t) * nr_reg;
   audio_base = (uint32_t *)new_space(space_size);
+  audio_base[3] = CONFIG_SB_SIZE;
 #ifdef CONFIG_HAS_PORT_IO
   add_pio_map ("audio", CONFIG_AUDIO_CTL_PORT, audio_base, space_size, audio_io_handler);
 #else
