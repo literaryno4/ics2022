@@ -1,6 +1,4 @@
-/***************************************************************************************
-* Copyright (c) 2014-2022 Zihao Yu, Nanjing University
-*
+/*
 * NEMU is licensed under Mulan PSL v2.
 * You can use this software according to the terms and conditions of the Mulan PSL v2.
 * You may obtain a copy of Mulan PSL v2 at:
@@ -20,6 +18,7 @@
 #include <cpu/decode.h>
 
 #define R(i) gpr(i)
+#define SR(i) sr(i)
 #define Mr vaddr_read
 #define Mw vaddr_write
 
@@ -141,6 +140,14 @@ static int decode_exec(Decode *s) {
   INSTPAT("0100000 ????? ????? 101 ????? 00100 11", srai   , I, R(dest) = ((sword_t)src1 >> (imm & 0x1f)));
   // -- conctrol
   INSTPAT("??????? ????? ????? ??? ????? 11001 11", jalr   , I, do_jalr(s, dest, src1, imm));
+  // conctrol state register
+  INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , I, word_t tmp = SR(imm); SR(imm) = src1; R(dest) = tmp);
+  INSTPAT("??????? ????? ????? 010 ????? 11100 11", csrrs  , I, word_t tmp = SR(imm); SR(imm) = SR(imm) | src1; R(dest) = tmp);
+  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, IFDEF(CONFIG_ETRACE, Log("exception ENTER: cause NO: %d\n", R(17))); \
+    s->dnpc = isa_raise_intr(R(17), s->snpc));
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , I, IFDEF(CONFIG_ETRACE, Log("exception EXIT: cause NO: %d\n", R(17))); \
+    s->dnpc = cpu.sr[CSR_mepc]);
+
 
   // ******** U type ************
   INSTPAT("??????? ????? ????? ??? ????? 00101 11", auipc  , U, R(dest) = imm + s->pc);

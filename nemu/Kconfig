@@ -154,6 +154,10 @@ config FTRACE
   bool "Enable function tracer"
   default n
 
+config ETRACE
+  bool "Enable exception tracer"
+  default n
+
 config DTRACE
   bool "Enable device tracer"
   default n

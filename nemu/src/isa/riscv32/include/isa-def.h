@@ -18,8 +18,17 @@
 
 #include <common.h>
 
+enum {
+  CSR_mepc = 0, CSR_mstatus, CSR_mcause, CSR_mtvec
+};
+
 typedef struct {
   word_t gpr[32];
+  //0: word_t mepc;
+  //1: word_t mstatus;
+  //2: word_t mcause;
+  //3: word_t mtvec;
+  word_t sr[4];
   vaddr_t pc;
 } riscv32_CPU_state;
 
