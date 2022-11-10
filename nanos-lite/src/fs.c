@@ -3,6 +3,9 @@
 typedef size_t (*ReadFn) (void *buf, size_t offset, size_t len);
 typedef size_t (*WriteFn) (const void *buf, size_t offset, size_t len);
 
+size_t ramdisk_read(void *buf, size_t offset, size_t len);
+size_t ramdisk_write(const void *buf, size_t offset, size_t len);
+
 typedef struct {
   char *name;
   size_t size;
@@ -31,6 +34,77 @@ static Finfo file_table[] __attribute__((used)) = {
 #include "files.h"
 };
 
+#define FILE_NUM sizeof(file_table) / sizeof(Finfo)
+
+typedef struct {
+  bool opened;
+  size_t cur_offset;
+} open_file;
+
+static open_file open_files[FILE_NUM];
+
 void init_fs() {
   // TODO: initialize the size of /dev/fb
+}
+
+
+int fs_open(const char *pathname, int flags, int mode) {
+  int fd;
+  for (fd = 0; fd < FILE_NUM; ++fd) {
+    if (strcmp(pathname, file_table[fd].name) == 0) {
+      open_files[fd].opened = true;
+      open_files[fd].cur_offset = file_table[fd].disk_offset;
+      return fd;
+    }
+  }
+  panic("fs_open error!\n");
+}
+
+int fs_read(int fd, void *buf, size_t len) {
+  if (!open_files[fd].opened) panic("fs_read error!\n");
+  int read_len, ret;
+  if (open_files[fd].cur_offset >= file_table[fd].disk_offset + file_table[fd].size) {
+    memset(buf, '\0', len);
+    return len;
+  } else if (open_files[fd].cur_offset + len >= file_table[fd].disk_offset + file_table[fd].size) {
+    read_len = file_table[fd].disk_offset + file_table[fd].size - open_files[fd].cur_offset;
+    ret = ramdisk_read(buf, open_files[fd].cur_offset, read_len);
+    memset(buf + read_len, '\0', len - read_len);
+  } else {
+    ret = ramdisk_read(buf, open_files[fd].cur_offset, len);
+  }
+  open_files[fd].cur_offset += ret;
+  return ret;
+}
+
+int fs_write(int fd, const void *buf, size_t len) {
+  if (!open_files[fd].opened) panic("fs_write error!\n");
+  assert(open_files[fd].cur_offset + len < file_table[fd].disk_offset + file_table[fd].size);
+  int ret = ramdisk_write(buf, open_files[fd].cur_offset, len);
+  open_files[fd].cur_offset += ret;
+  return ret;
+}
+
+int fs_lseek(int fd, size_t offset, int whence) {
+  if (!open_files[fd].opened) panic("fs_ls error!\n");
+  switch (whence) {
+  case SEEK_SET:
+    open_files[fd].cur_offset = file_table[fd].disk_offset + offset;
+    break;
+  case SEEK_CUR:
+    open_files[fd].cur_offset += offset;
+    break;
+  case SEEK_END:
+    open_files[fd].cur_offset = file_table[fd].disk_offset + file_table[fd].size + offset;
+    break;
+  default:
+    panic("fs_lseek error: no such whence\n");
+  }
+  return open_files[fd].cur_offset - file_table[fd].disk_offset;
+}
+
+int fs_close(int fd) {
+  open_files[fd].opened = false;
+  open_files[fd].cur_offset = file_table[fd].disk_offset;
+  return 0;
 }

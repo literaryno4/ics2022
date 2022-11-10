@@ -143,9 +143,9 @@ static int decode_exec(Decode *s) {
   // conctrol state register
   INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , I, word_t tmp = SR(imm); SR(imm) = src1; R(dest) = tmp);
   INSTPAT("??????? ????? ????? 010 ????? 11100 11", csrrs  , I, word_t tmp = SR(imm); SR(imm) = SR(imm) | src1; R(dest) = tmp);
-  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, IFDEF(CONFIG_ETRACE, Log("exception ENTER: cause NO: %d\n", R(17))); \
+  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , I, IFDEF(CONFIG_ETRACE, Log("exception ENTER: cause NO: %d", R(17))); \
     s->dnpc = isa_raise_intr(R(17), s->snpc));
-  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , I, IFDEF(CONFIG_ETRACE, Log("exception EXIT: cause NO: %d\n", R(17))); \
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , I, IFDEF(CONFIG_ETRACE, Log("exception EXIT: cause NO: %d", R(17))); \
     s->dnpc = cpu.sr[CSR_mepc]);
 
 
