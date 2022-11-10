@@ -5,6 +5,7 @@ typedef size_t (*WriteFn) (const void *buf, size_t offset, size_t len);
 
 size_t ramdisk_read(void *buf, size_t offset, size_t len);
 size_t ramdisk_write(const void *buf, size_t offset, size_t len);
+size_t serial_write(const void *buf, size_t offset, size_t len);
 
 typedef struct {
   char *name;
@@ -29,8 +30,8 @@ size_t invalid_write(const void *buf, size_t offset, size_t len) {
 /* This is the information about all files in disk. */
 static Finfo file_table[] __attribute__((used)) = {
   [FD_STDIN]  = {"stdin", 0, 0, invalid_read, invalid_write},
-  [FD_STDOUT] = {"stdout", 0, 0, invalid_read, invalid_write},
-  [FD_STDERR] = {"stderr", 0, 0, invalid_read, invalid_write},
+  [FD_STDOUT] = {"stdout", 0, 0, invalid_read, serial_write},
+  [FD_STDERR] = {"stderr", 0, 0, invalid_read, serial_write},
 #include "files.h"
 };
 
@@ -45,6 +46,9 @@ static open_file open_files[FILE_NUM];
 
 void init_fs() {
   // TODO: initialize the size of /dev/fb
+  open_files[FD_STDIN].opened = true;
+  open_files[FD_STDOUT].opened = true;
+  open_files[FD_STDERR].opened = true;
 }
 
 
@@ -79,8 +83,11 @@ int fs_read(int fd, void *buf, size_t len) {
 
 int fs_write(int fd, const void *buf, size_t len) {
   if (!open_files[fd].opened) panic("fs_write error!\n");
-  assert(open_files[fd].cur_offset + len < file_table[fd].disk_offset + file_table[fd].size);
-  int ret = ramdisk_write(buf, open_files[fd].cur_offset, len);
+  // assert(open_files[fd].cur_offset + len < file_table[fd].disk_offset + file_table[fd].size);
+  size_t (*write_fn) (const void *buf, size_t offset, size_t len);
+  write_fn = file_table[fd].write == NULL ? ramdisk_write : file_table[fd].write;
+
+  int ret = write_fn(buf, open_files[fd].cur_offset, len);
   open_files[fd].cur_offset += ret;
   return ret;
 }

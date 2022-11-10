@@ -27,20 +27,24 @@ const char* sys_names[] = {
 
 extern char _end;
 
-int sys_write(int fd, const void* buf, size_t len) {
-  const char* bf = buf;
-  if (fd == 1 || fd == 2) {
-    int i;
-    for (i = 0; i < len; ++i) {
-      putch(bf[i]);
-    }
-    return i;
-  } else {
-    return fs_write(fd, buf, len);
-  }
+int sys_brk(void* addr) {
+  return 0;
 }
 
-int sys_brk(void* addr) {
+struct timeval {
+  uint64_t tv_sec;
+  uint64_t tv_usec;
+};
+
+struct timezone {
+  int tz_minuteswest;		/* Minutes west of GMT.  */
+  int tz_dsttime;		/* Nonzero if DST is ever in effect.  */
+};
+
+int sys_gettimeofday(struct timeval *tv, struct timezone *tz) {
+  uint64_t us = io_read(AM_TIMER_UPTIME).us;
+  tv->tv_sec = us / 1000000;
+  tv->tv_usec = us % 1000000;
   return 0;
 }
 
@@ -61,7 +65,7 @@ void do_syscall(Context *c) {
       c->GPRx = fs_read(a[1], (void*)a[2], a[3]);
       break;
     case SYS_write: 
-      c->GPRx = sys_write(a[1], (const void*)a[2], a[3]); 
+      c->GPRx = fs_write(a[1], (const void*)a[2], a[3]); 
       break;
     case SYS_close:
       c->GPRx = fs_close(a[1]);
@@ -70,6 +74,9 @@ void do_syscall(Context *c) {
       break;
     case SYS_lseek:
       c->GPRx = fs_lseek(a[1], a[2], a[3]);
+      break;
+    case SYS_gettimeofday:
+      c->GPRx = sys_gettimeofday((void*)a[1], (void*)a[2]);
       break;
     default: panic("Unhandled syscall ID = %d", a[0]);
   }
