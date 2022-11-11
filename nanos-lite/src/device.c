@@ -22,7 +22,14 @@ size_t serial_write(const void *buf, size_t offset, size_t len) {
 }
 
 size_t events_read(void *buf, size_t offset, size_t len) {
-  return 0;
+  AM_INPUT_KEYBRD_T ev = io_read(AM_INPUT_KEYBRD);
+  if (ev.keycode == AM_KEY_NONE) return 0;
+  size_t nl = strlen(keyname[ev.keycode]);
+  nl = len < nl ? len : nl;
+  strncpy(buf, keyname[ev.keycode], nl);
+  char* status = ev.keydown ? " DOWN" : " UP";
+  strncpy(buf + nl, status, strlen(status) + 1);
+  return nl + strlen(status);
 }
 
 size_t dispinfo_read(void *buf, size_t offset, size_t len) {

@@ -6,6 +6,7 @@ typedef size_t (*WriteFn) (const void *buf, size_t offset, size_t len);
 size_t ramdisk_read(void *buf, size_t offset, size_t len);
 size_t ramdisk_write(const void *buf, size_t offset, size_t len);
 size_t serial_write(const void *buf, size_t offset, size_t len);
+size_t events_read(void *buf, size_t offset, size_t len);
 
 typedef struct {
   char *name;
@@ -15,7 +16,7 @@ typedef struct {
   WriteFn write;
 } Finfo;
 
-enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_FB};
+enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_EVENTS, FD_FB};
 
 size_t invalid_read(void *buf, size_t offset, size_t len) {
   panic("should not reach here");
@@ -32,6 +33,7 @@ static Finfo file_table[] __attribute__((used)) = {
   [FD_STDIN]  = {"stdin", 0, 0, invalid_read, invalid_write},
   [FD_STDOUT] = {"stdout", 0, 0, invalid_read, serial_write},
   [FD_STDERR] = {"stderr", 0, 0, invalid_read, serial_write},
+  [FD_EVENTS] = {"/dev/events", 0, 0, events_read, invalid_write},
 #include "files.h"
 };
 
@@ -49,6 +51,7 @@ void init_fs() {
   open_files[FD_STDIN].opened = true;
   open_files[FD_STDOUT].opened = true;
   open_files[FD_STDERR].opened = true;
+  open_files[FD_EVENTS].opened = true;
 }
 
 
@@ -67,15 +70,21 @@ int fs_open(const char *pathname, int flags, int mode) {
 int fs_read(int fd, void *buf, size_t len) {
   if (!open_files[fd].opened) panic("fs_read error!\n");
   int read_len, ret;
+  size_t (*read_fn) (void *buf, size_t offset, size_t len);
+  read_fn = file_table[fd].read;
+  if (read_fn == NULL) read_fn = ramdisk_read;
+  if (file_table[fd].size == 0) {
+    return read_fn(buf, open_files[fd].cur_offset, len);
+  }
   if (open_files[fd].cur_offset >= file_table[fd].disk_offset + file_table[fd].size) {
     memset(buf, '\0', len);
     return len;
   } else if (open_files[fd].cur_offset + len >= file_table[fd].disk_offset + file_table[fd].size) {
     read_len = file_table[fd].disk_offset + file_table[fd].size - open_files[fd].cur_offset;
-    ret = ramdisk_read(buf, open_files[fd].cur_offset, read_len);
+    ret = read_fn(buf, open_files[fd].cur_offset, read_len);
     memset(buf + read_len, '\0', len - read_len);
   } else {
-    ret = ramdisk_read(buf, open_files[fd].cur_offset, len);
+    ret = read_fn(buf, open_files[fd].cur_offset, len);
   }
   open_files[fd].cur_offset += ret;
   return ret;
