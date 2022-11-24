@@ -6,7 +6,7 @@
 #include <sys/time.h>
 
 static int evtdev = 3;
-static int fbdev = -1;
+static int fbdev = 5;
 static int screen_w = 0, screen_h = 0;
 
 uint32_t NDL_GetTicks() {
@@ -40,6 +40,7 @@ void NDL_OpenCanvas(int *w, int *h) {
 }
 
 void NDL_DrawRect(uint32_t *pixels, int x, int y, int w, int h) {
+  write(fbdev, pixels + (y * 400 + x), w * h);
 }
 
 void NDL_OpenAudio(int freq, int channels, int samples) {

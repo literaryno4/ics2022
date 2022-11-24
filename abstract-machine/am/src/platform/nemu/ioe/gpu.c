@@ -1,5 +1,6 @@
 #include <am.h>
 #include <nemu.h>
+#include <stdio.h>
 
 #define SYNC_ADDR (VGACTL_ADDR + 4)
 

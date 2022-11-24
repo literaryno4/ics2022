@@ -37,6 +37,20 @@ size_t dispinfo_read(void *buf, size_t offset, size_t len) {
 }
 
 size_t fb_write(const void *buf, size_t offset, size_t len) {
+  printf("in fb write\n");
+  int w = 128, h = 128;
+  for (int j = 0; j < h; ++j) {
+    for (int i = 0; i < w; ++i) {
+      io_write(AM_GPU_FBDRAW, i, j, (void*)buf + (j * w + i), 1, 1, false);
+    }
+    io_write(AM_GPU_FBDRAW, 0, 0, NULL, 0, 0, true);
+  }
+
+  io_write(AM_GPU_FBDRAW, 0, 0, NULL, 0, 0, true);
+  return len;
+}
+
+size_t fbctl_write(const void *buf, size_t offset, size_t len) {
   return 0;
 }
 
